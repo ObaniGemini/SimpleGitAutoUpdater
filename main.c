@@ -7,6 +7,7 @@
 
 
 #define BUF_SIZE 4096
+#define FALSE 0
 #define TRUE 1
 
 void Error( int cond, const char* err_msg ) {
@@ -17,31 +18,31 @@ void Error( int cond, const char* err_msg ) {
 }
 
 int gitRevParseOutput( char* buffer ) {
-	char tmp[BUF_SIZE] = { };
-
+	static char tmp[BUF_SIZE] = { };
 	int link[2];
+	pid_t pid;
 
 	Error( pipe(link) == -1, "Error on pipe" );
+	Error( (pid = fork()) == -1, "git rev-parse fork failed" );
 
-	pid_t pid = fork();
-	Error( pid == -1, "git rev-parse fork failed" );
 	if( pid == 0 ) {
-		dup2(link[1], STDOUT_FILENO);
-		close(link[0]);
-		close(link[1]);
+		Error( dup2(link[1], STDOUT_FILENO) == -1, "CHILD: dup2 error" );
+		Error( close(link[0]) == -1, "CHILD: close(link[0]) error" );
+		Error( close(link[1]) == -1, "CHILD: close(link[1]) error" );
 		execl("/bin/git", "git", "rev-parse", "origin/main", NULL);
-		Error( TRUE, "git rev-parse origin/main failed" );
+		Error( TRUE, "CHILD: git rev-parse origin/main failed" );
 	} else {
-		close(link[1]);
+		Error( close(link[1]) == -1, "PARENT: close(link[1]) error" );
 		int nbytes = read( link[0], tmp, BUF_SIZE );
+		Error( nbytes == -1, "PARENT: couldn't read on link[0]" );
 		if( strcmp( buffer, tmp ) != 0 ) {
 			memset( buffer + nbytes, '\0', BUF_SIZE - nbytes );
 			memcpy( buffer, tmp, nbytes );
-			return 1;
+			return TRUE;
 		}
 	}
 
-	return 0;
+	return FALSE;
 }
 
 
@@ -65,9 +66,12 @@ int main( int argc, char* argv[] ) {
 			int status;
 			while( TRUE ) {
 				sleep( 30 );
-				if( gitRevParseOutput( last_commit ) ) break; //update found				
+				waitpid( pid, &status, WNOHANG );
+				Error( WIFEXITED( status ), "Program exitted without our permission (error ?)" );
+
+				if( gitRevParseOutput( last_commit ) ) break; //update found			
 			}
-			kill( 0, SIGTERM );
+			kill( pid, SIGTERM );
 		}
 	}
 	
