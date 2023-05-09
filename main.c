@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,8 +30,8 @@ int gitRevParseOutput( char* buffer ) {
 		Error( dup2(link[1], STDOUT_FILENO) == -1, "CHILD: dup2 error" );
 		Error( close(link[0]) == -1, "CHILD: close(link[0]) error" );
 		Error( close(link[1]) == -1, "CHILD: close(link[1]) error" );
-		execl("/bin/git", "git", "rev-parse", "origin/main", NULL);
-		Error( TRUE, "CHILD: git rev-parse origin/main failed" );
+		execl("/bin/git", "git", "rev-parse", "origin/HEAD", NULL);
+		Error( TRUE, "CHILD: git rev-parse origin/HEAD failed" );
 	} else {
 		Error( close(link[1]) == -1, "PARENT: close(link[1]) error" );
 		int nbytes = read( link[0], tmp, BUF_SIZE );
@@ -47,10 +48,7 @@ int gitRevParseOutput( char* buffer ) {
 
 
 int main( int argc, char* argv[] ) {
-	if( argc != 2 ) {
-		printf("Wrong arguments\nExpected: %s <command>\n", argv[ 0 ]);
-		return 1;
-	}
+	Error( argc != 2, "Wrong arguments\nExpected: gitupdater <program>\n" );
 
 	char last_commit[BUF_SIZE] = { };
 	gitRevParseOutput( last_commit );
@@ -64,10 +62,12 @@ int main( int argc, char* argv[] ) {
 			Error( TRUE, "execl failed" );
 		} else {
 			int status;
+			sleep(1);
 			while( TRUE ) {
-				sleep( 30 );
 				waitpid( pid, &status, WNOHANG );
 				Error( WIFEXITED( status ), "Program exitted without our permission (error ?)" );
+				
+				sleep( 30 );
 
 				if( gitRevParseOutput( last_commit ) ) break; //update found			
 			}
