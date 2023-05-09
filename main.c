@@ -67,7 +67,7 @@ int main( int argc, char* argv[] ) {
 				sleep( 30 );
 				if( gitRevParseOutput( last_commit ) ) break; //update found				
 			}
-			kill( pid, SIGTERM );
+			kill( 0, SIGTERM );
 		}
 	}
 	
