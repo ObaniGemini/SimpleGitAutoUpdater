@@ -1,7 +1,7 @@
 OUTPUT=gitupdater
 
 $(OUTPUT): main.c
-	gcc $^ -o $@
+	gcc -lc $^ -o $@
 
 clean:
 	rm -rf $(OUTPUT)
